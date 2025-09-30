@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Code Complexity Analyzer</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            background-color: #f4f6f8;
+            color: #333;
+        }
+        header {
+            background-color: #0b5377;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        .container {
+            display: flex;
+            gap: 20px;
+            padding: 20px;
+        }
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            flex: 1;
+        }
+        textarea {
+            width: 100%;
+            height: 250px;
+            font-family: monospace;
+            font-size: 14px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            padding: 10px;
+            resize: vertical;
+        }
+        select, button {
+            margin-top: 10px;
+            padding: 10px;
+            font-size: 16px;
+            border-radius: 5px;
+            border: none;
+        }
+        button {
+            background-color: #0b5377;
+            color: white;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        button:hover {
+            background-color: #09415a;
+        }
+        #errors {
+            color: red;
+            margin-top: 10px;
+        }
+        table {
+            width: 100%;
+            margin-top: 15px;
+            border-collapse: collapse;
+        }
+        table, th, td {
+            border: 1px solid #ccc;
+        }
+        th, td {
+            padding: 8px;
+            text-align: center;
+        }
+        th {
+            background-color: #0b5377;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <header>Code Complexity Analyzer</header>
+    <div class="container">
+        <div class="card">
+            <label for="language">Language:</label>
+            <select id="language">
+                <option value="python">Python</option>
+                <option value="cpp">C/C++</option>
+            </select>
+            <textarea id="code" placeholder="Paste your code here..."></textarea>
+            <button onclick="analyzeCode()">Analyze</button>
+            <div id="errors"></div>
+        </div>
+        <div class="card">
+            <canvas id="complexityChart" width="400" height="300"></canvas>
+            <table id="valuesTable">
+                <thead>
+                    <tr>
+                        <th>n</th>
+                        <th>Time Complexity</th>
+                        <th>Space Complexity</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        let chart;
+
+        function complexityValue(type, n) {
+            switch(type) {
+                case "O(1)": return 1;
+                case "O(n)": return n;
+                case "O(n^2)": return n*n;
+                case "O(n^3)": return n*n*n;
+                default: return n;
+            }
+        }
+
+        function analyzeCode() {
+            const code = document.getElementById("code").value;
+            const language = document.getElementById("language").value;
+
+            fetch("/analyze", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ code, language })
+            })
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById("errors").innerText = data.errors.join("\n");
+                if(data.errors.length > 0) return;
+
+                const nValues = Array.from({length: 10}, (_, i) => i+1);
+                const timeValues = nValues.map(n => complexityValue(data.time_complexity, n));
+                const spaceValues = nValues.map(n => complexityValue(data.space_complexity, n));
+
+                // Update chart
+                if(chart) chart.destroy();
+                const ctx = document.getElementById('complexityChart').getContext('2d');
+                chart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: nValues,
+                        datasets: [
+                            { label: "Time Complexity", data: timeValues, borderColor: 'red', fill: false, tension: 0.3 },
+                            { label: "Space Complexity", data: spaceValues, borderColor: 'blue', fill: false, tension: 0.3 }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: { legend: { position: 'top' } },
+                        scales: {
+                            y: { type: 'logarithmic', title: { display: true, text: 'Operations (log scale)' }, beginAtZero: false },
+                            x: { title: { display: true, text: 'Input size n' } }
+                        }
+                    }
+                });
+
+                // Update table
+                const tbody = document.querySelector("#valuesTable tbody");
+                tbody.innerHTML = "";
+                nValues.forEach((n, i) => {
+                    const tr = document.createElement("tr");
+                    tr.innerHTML = `<td>${n}</td><td>${timeValues[i]}</td><td>${spaceValues[i]}</td>`;
+                    tbody.appendChild(tr);
+                });
+            });
+        }
+    </script>
+</body>
+</html>
